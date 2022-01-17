@@ -1,0 +1,8 @@
+os:
+  - osx
+language: swift
+osx_image: xcode12.5
+env:
+  - PROJECT_NAME=Granite
+script:
+  - swift build
