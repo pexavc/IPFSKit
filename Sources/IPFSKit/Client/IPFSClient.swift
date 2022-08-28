@@ -17,6 +17,8 @@ extension Multihash : Hashable {
 
 public protocol IPFSBase {
     var baseUrl:    String { get }
+    var projectId:  String { get }
+    var secret:     String { get }
     
     /// Second Tier commands
     var refs:       Refs { get }
@@ -160,6 +162,8 @@ enum IpfsCmdString : String {
 public class IPFSClient: IPFSBase {
 
     public var baseUrl: String = ""
+    public var projectId: String = ""
+    public var secret: String = ""
     
     public let scheme: String
     public let host: String
@@ -190,7 +194,7 @@ public class IPFSClient: IPFSBase {
         if  protoComponents[0].hasPrefix("ip") == true &&
             protoComponents[2].hasPrefix("tcp") == true {
                 
-            try self.init(host: protoComponents[1],port: Int(protoComponents[3])!)
+            try self.init(host: protoComponents[1],port: Int(protoComponents[3])!, id: "", secret: "")
         } else {
             throw IpfsApiError.initError
         }
@@ -200,16 +204,17 @@ public class IPFSClient: IPFSBase {
         try self.init(addr: newMultiaddr(addr))
     }
 
-    public init(host: String, port: Int, version: String = "/api/v0/", ssl: Bool = false) throws {
+    public init(host: String, port: Int, version: String = "/api/v0/", ssl: Bool = false, id: String, secret: String) throws {
         self.scheme = ssl ? "https://" : "http://"
         self.host = host
         self.port = port
         self.version = version
-        
+	self.projectId = id
+	self.secret = secret
         
         /// No https yet as TLS1.2 in OS X 10.11 is not allowing comms with the node.
         baseUrl = "\(scheme)\(host):\(port)\(version)"
-        net = HttpIo()
+        net = HttpIo(auth: authData(projectId: self.projectId, secret: self.secret))
         
         /** All of IPFSApi's properties need to be set before we can use self which
             is why we can't just init the sub commands with self (unless we make 
@@ -509,5 +514,11 @@ func buildArgString(_ args: [String]) -> String {
         outString += "arg=\(arg.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed)!)&"
     }
     return outString
+}
+
+public func authData(projectId: String, secret: String) -> String {
+    let authString = projectId + ":" + secret
+    let authD = authString.data(using: .utf8)!.base64EncodedString()
+    return authD
 }
 
