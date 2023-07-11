@@ -23,7 +23,13 @@ import IPFSKit
 let client: IPFSClient?
     
 public init() {
-    client = try? IPFSClient.init(host: "ipfs.infura.io", port: 5001, ssl: true)
+    client = try? IPFSClient.init(
+        host: "ipfs.infura.io", 
+        port: 5001, 
+        ssl: true, 
+        id: "INFURA-PROJECT-ID", 
+        secret: "INFURA-SECRET"
+    )
 }
 ```
 

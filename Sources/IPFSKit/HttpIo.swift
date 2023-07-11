@@ -16,6 +16,7 @@ enum HttpIoError : Error {
 }
 
 public struct HttpIo : NetworkIo {
+    let auth: String
 
     public func receiveFrom(_ source: String, completionHandler: @escaping (Data) throws -> Void) throws {
         guard let url = URL(string: source) else { throw HttpIoError.urlError("Invalid URL") }
@@ -55,7 +56,7 @@ public struct HttpIo : NetworkIo {
     
     public func sendTo(_ target: String, content: Data, completionHandler: @escaping (Data) -> Void) throws {
 
-        var multipart = try Multipart(targetUrl: target, encoding: .utf8)
+        var multipart = try Multipart(targetUrl: target, encoding: .utf8, auth: self.auth)
         multipart = try Multipart.addFilePart(multipart, fileName: nil , fileData: content)
         Multipart.finishMultipart(multipart, completionHandler: completionHandler)
     }
@@ -63,7 +64,7 @@ public struct HttpIo : NetworkIo {
 
     public func sendTo(_ target: String, filePath: String, completionHandler: @escaping (Data) -> Void) throws {
         
-        var multipart = try Multipart(targetUrl: target, encoding: .utf8)
+        var multipart = try Multipart(targetUrl: target, encoding: .utf8, auth: self.auth)
         
         multipart = try handle(oldMultipart: multipart, files: [filePath])
         

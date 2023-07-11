@@ -23,7 +23,7 @@ public struct Multipart {
     var body = NSMutableData()
     let request: NSMutableURLRequest
 
-    init(targetUrl: String, encoding: String.Encoding) throws {
+    init(targetUrl: String, encoding: String.Encoding, auth: String) throws {
         
         // Eg. UTF8
         self.encoding = encoding
@@ -35,6 +35,7 @@ public struct Multipart {
 
         guard let url = URL(string: targetUrl) else { throw MultipartError.failedURLCreation }
         request = NSMutableURLRequest(url: url)
+	request.addValue("Basic \(auth)", forHTTPHeaderField: "Authorization")
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary="+boundary, forHTTPHeaderField: "content-type")
         request.setValue("Swift IPFS Client", forHTTPHeaderField: "user-agent")
