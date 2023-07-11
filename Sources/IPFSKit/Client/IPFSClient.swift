@@ -1,7 +1,7 @@
 //
 //  IPFSBase.swift
 //
-//  Created by 0xKala
+//  Created by PEXAVC
 //
 //  Incorporating Matteo Sartori's work on 20/10/15. Made Swift 5 compatible.
 //
