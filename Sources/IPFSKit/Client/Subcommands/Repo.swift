@@ -13,8 +13,10 @@ public class Repo : ClientSubCommand {
     
     /** gc is a plumbing command that will sweep the local set of stored objects
      and remove ones that are not pinned in order to reclaim hard disk space. */
-    public func gc(_ completionHandler: @escaping (JsonType) -> Void) throws {
-        try parent!.fetchJson("repo/gc", completionHandler: completionHandler)
+    public func gc() async throws -> JsonType {
+        try await parent!.fetchJson("repo/gc")
+            .eraseToAnyPublisher()
+            .async()
     }
 //    public func gc(completionHandler: ([[String : AnyObject]]) -> Void) throws {
 //        try parent!.fetchData("repo/gc") {

@@ -2,7 +2,7 @@
 //  GraniteLogger.swift
 //
 //
-//  Created by 0xKala on 2/26/21.
+//  Created by PEXAVC on 2/26/21.
 //
 
 import Foundation
@@ -69,12 +69,6 @@ public struct GraniteLogger {
         
         var disable: Bool {
             return true
-//            switch self {
-//            case .expedition:
-//                return false
-//            default:
-//                return true
-//            }
         }
     }
     

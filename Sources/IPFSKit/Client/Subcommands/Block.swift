@@ -13,15 +13,15 @@ public class Block : ClientSubCommand {
     
     var parent: IPFSBase?
     
-    public func get(_ hash: Multihash, completionHandler: @escaping ([UInt8]) -> Void) throws {
-        try parent!.fetchBytes("block/get?stream-channels=true&arg=\(b58String(hash))", completionHandler: completionHandler)
+    public func get(_ hash: Multihash) async throws -> [UInt8] {
+        try await  parent!.fetchBytes("block/get?stream-channels=true&arg=\(b58String(hash))")
     }                                                                
     
-    public func put(_ data: [UInt8], completionHandler: @escaping (MerkleNode) -> Void) throws {
+    public func put(_ data: [UInt8]) async throws -> MerkleNode {
         let bytes = data.withUnsafeBytes { $0.load(as: [UInt8].self) }
         let data2 = Data(bytes: bytes, count: data.count)
         
-        try parent!.net.sendTo(parent!.baseUrl+"block/put?stream-channels=true", content: data2) {
+        return try await parent!.net.sendTo(parent!.baseUrl+"block/put?stream-channels=true", content: data2).map {
             result in
             
             do {
@@ -29,15 +29,20 @@ public class Block : ClientSubCommand {
                     throw IpfsApiError.jsonSerializationFailed
                 }
                 
-                completionHandler(try merkleNodeFromJson(json as AnyObject))
+                return try merkleNodeFromJson(json as AnyObject)
             } catch {
                 GraniteLogger.info("Block Error:\(error)")
+                return .init()
             }
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
-    public func stat(_ hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
+    public func stat(_ hash: Multihash) async throws -> JsonType {
         
-        try parent!.fetchJson("block/stat?stream-channels=true&arg=" + b58String(hash), completionHandler: completionHandler)
+        try await parent!.fetchJson("block/stat?stream-channels=true&arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
     }
 }

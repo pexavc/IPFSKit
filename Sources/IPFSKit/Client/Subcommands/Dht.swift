@@ -101,22 +101,31 @@ public class Dht : ClientSubCommand {
     }
    
     /** Run a 'findClosestPeers' query through the DHT */
-    public func query(_ hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
-        try parent!.fetchJson("dht/query?arg=" + b58String(hash) , completionHandler: completionHandler)
+    public func query(_ hash: Multihash) async throws -> JsonType {
+        try await parent!.fetchJson("dht/query?arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
     }
     
     /** Run a 'FindPeer' query through the DHT */
-    public func findpeer(_ hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
-        try parent!.fetchJson("dht/findpeer?arg=" + b58String(hash), completionHandler: completionHandler)
+    public func findpeer(_ hash: Multihash) async throws -> JsonType {
+        try await parent!.fetchJson("dht/findpeer?arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
     }
     
     /** Will return the value stored in the dht at the given key */
-    public func get(_ hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
-        try parent!.fetchJson("dht/get?arg=" + b58String(hash), completionHandler: completionHandler)
+    public func get(_ hash: Multihash) async throws -> JsonType {
+        try await parent!.fetchJson("dht/get?arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
     }
     
     /** Will store the given key value pair in the dht. */
-    public func put(_ key: String, value: String, completionHandler: @escaping (JsonType) -> Void) throws {
-        try parent!.fetchJson("dht/put?arg=\(key)&arg=\(value)", completionHandler: completionHandler)
+    public func put(_ key: String, value: String) async throws -> JsonType {
+        try await parent!
+                    .fetchJson("dht/put?arg=\(key)&arg=\(value)")
+                    .eraseToAnyPublisher()
+                    .async()
     }
 }

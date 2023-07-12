@@ -9,6 +9,8 @@
 //  Licensed under MIT See LICENCE file in the root of this project for details.
 
 import Foundation
+import SwiftUI
+import Combine
 
 enum HttpIoError : Error {
     case urlError(String)
@@ -18,26 +20,31 @@ enum HttpIoError : Error {
 public struct HttpIo : NetworkIo {
     let auth: String
 
-    public func receiveFrom(_ source: String, completionHandler: @escaping (Data) throws -> Void) throws {
+    public func receiveFrom(_ source: String) throws -> AnyPublisher<Data, URLError> {
         guard let url = URL(string: source) else { throw HttpIoError.urlError("Invalid URL") }
         GraniteLogger.info("HttpIo receiveFrom url is \(url)")
-        let task = URLSession.shared.dataTask(with: url) {
-            (data: Data?, response: URLResponse?, error: Error?) in
-            
-            do {
-                guard error == nil else { throw HttpIoError.transmissionError((error?.localizedDescription)!) }
-                guard let data = data else { throw IpfsApiError.nilData }
-                
-//                GraniteLogger.info("The data:",NSString(data: data, encoding: String.Encoding.utf8.rawValue))
-                
-                try completionHandler(data)
-                
-            } catch {
-                GraniteLogger.info("Error \(error) in completionHandler passed to fetchData ")
-            }
-        }
+//        let task = URLSession.shared.dataTask(with: url) {
+//            (data: Data?, response: URLResponse?, error: Error?) in
+//
+//            do {
+//                guard error == nil else { throw HttpIoError.transmissionError((error?.localizedDescription)!) }
+//                guard let data = data else { throw IpfsApiError.nilData }
+//
+////                GraniteLogger.info("The data:",NSString(data: data, encoding: String.Encoding.utf8.rawValue))
+//
+//                try completionHandler(data)
+//
+//            } catch {
+//                GraniteLogger.info("Error \(error) in completionHandler passed to fetchData ")
+//            }
+//        }
+//
+//        task.resume()
         
-        task.resume()
+        return URLSession.shared
+            .dataTaskPublisher(for: url)
+            .map { $0.data }
+            .eraseToAnyPublisher()
     }
    
     
@@ -54,21 +61,22 @@ public struct HttpIo : NetworkIo {
         task.resume()
     }
     
-    public func sendTo(_ target: String, content: Data, completionHandler: @escaping (Data) -> Void) throws {
+    public func sendTo(_ target: String, content: Data) throws -> AnyPublisher<Data, URLError> {
 
         var multipart = try Multipart(targetUrl: target, encoding: .utf8, auth: self.auth)
         multipart = try Multipart.addFilePart(multipart, fileName: nil , fileData: content)
-        Multipart.finishMultipart(multipart, completionHandler: completionHandler)
+        
+        return Multipart.finishMultipart(multipart)
     }
 
 
-    public func sendTo(_ target: String, filePath: String, completionHandler: @escaping (Data) -> Void) throws {
+    public func sendTo(_ target: String, filePath: String) throws -> AnyPublisher<Data, URLError> {
         
         var multipart = try Multipart(targetUrl: target, encoding: .utf8, auth: self.auth)
         
         multipart = try handle(oldMultipart: multipart, files: [filePath])
         
-        Multipart.finishMultipart(multipart, completionHandler: completionHandler)
+        return Multipart.finishMultipart(multipart)
         
     }
     
