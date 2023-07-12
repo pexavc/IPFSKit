@@ -33,6 +33,10 @@ struct InfuraGateway: IPFSGateway {
 IPFSKit.gateway = InfuraGateway()
 ```
 
+`InfuraHost` is a predefined host that is ready to use:
+
+https://github.com/pexavc/IPFSKit/blob/e0bf830a919b56ac4006165d3536768d95a6c8ea/Sources/IPFSKit/Models/IPFSHost.swift#L20-L45
+
 ### Adding data to IPFS
 
 ```swift
@@ -49,7 +53,7 @@ Convert any type of object into a `Data` type to prepare for adding.
 
 ### Pinning data to IPFS
 
-> Infura seems to have updated their services to automatically pin data that is added via the `/add` endpoint. This step is uncessary depending on the provider used or edge cases involved.
+> Infura seems to have updated their services to automatically pin data that is added via the `/add` endpoint (the previous step). This step is uncessary depending on the provider used or edge cases involved.
 
 ```swift
 
