@@ -13,70 +13,72 @@ public class Pin : ClientSubCommand {
     
     var parent: IPFSBase?
     
-    public func add(_ hash: Multihash, completionHandler: @escaping ([Multihash]) -> Void) throws {
+    public func add(_ hash: Multihash) async throws -> [Multihash] {
         
-        try parent!.fetchJson("pin/add?stream-channels=true&arg=\(b58String(hash))") {
-            result in
-            
-            guard let objects = result.object?["Pins"]?.array else {
-                throw IpfsApiError.pinError("Pin.add error: No Pinned objects in JSON data.")
-            }
-            
-            let multihashes = try objects.map { try fromB58String($0.string!) }
-            
-            completionHandler(multihashes)
+        let result = try await parent!.fetchJson("pin/add?stream-channels=true&arg=\(b58String(hash))")
+            .eraseToAnyPublisher()
+            .async()
+        
+        
+        guard let objects = result.object?["Pins"]?.array else {
+            throw IpfsApiError.pinError("Pin.add error: No Pinned objects in JSON data.")
         }
+        
+        let multihashes = try objects.map { try fromB58String($0.string!) }
+        
+        return multihashes
     }
     
     /** List objects pinned to local storage */
-    public func ls(_ completionHandler: @escaping ([Multihash : JsonType]) -> Void) throws {
+    public func ls() async throws -> [Multihash : JsonType] {
         
         /// The default is .Recursive
-        try self.ls(.Recursive) {
-            result in
-            
-            ///turn the result into a [Multihash : AnyObject]
-            var multihashes: [Multihash : JsonType] = [:]
-            if let hashes = result.object {
-                for (k,v) in hashes {
-                    multihashes[try fromB58String(k)] = v
-                }
-            }
-            
-            completionHandler(multihashes)
-        }
-    }
-    
-    public func ls(_ pinType: PinType, completionHandler: @escaping (JsonType) throws -> Void) throws {
+        let result = try await self.ls(.Recursive)
         
-        try parent!.fetchJson("pin/ls?stream-channels=true&t=" + pinType.rawValue) {
-            result in
-            
-            guard let objects = result.object?[IpfsCmdString.Keys.rawValue] else {
-                throw IpfsApiError.pinError("Pin.ls error: No Keys Dictionary in JSON data.")
-            }
-            
-            try completionHandler(objects)
-        }
-    }
-    
-    public func rm(_ hash: Multihash, completionHandler: @escaping ([Multihash]) -> Void) throws {
-        try self.rm(hash, recursive: true, completionHandler: completionHandler)
-    }
-    
-    public func rm(_ hash: Multihash, recursive: Bool, completionHandler: @escaping ([Multihash]) -> Void) throws {
         
-        try parent!.fetchJson("pin/rm?stream-channels=true&r=\(recursive)&arg=\(b58String(hash))") {
-            result in
-            
-            guard let objects = result.object?["Pins"]?.array else {
-                throw IpfsApiError.pinError("Pin.rm error: No Pinned objects in JSON data.")
+        ///turn the result into a [Multihash : AnyObject]
+        var multihashes: [Multihash : JsonType] = [:]
+        if let hashes = result.object {
+            for (k,v) in hashes {
+                multihashes[try fromB58String(k)] = v
             }
-            
-            let multihashes = try objects.map { try fromB58String($0.string!) }
-            
-            completionHandler(multihashes)
         }
+        
+        return multihashes
+    }
+    
+    public func ls(_ pinType: PinType) async throws -> JsonType {
+        
+        let result = try await parent!.fetchJson("pin/ls?stream-channels=true&t=" + pinType.rawValue)
+            .eraseToAnyPublisher()
+            .async()
+        
+        guard let object = result.object?[IpfsCmdString.Keys.rawValue] else {
+            throw IpfsApiError.pinError("Pin.ls error: No Keys Dictionary in JSON data.")
+        }
+        
+        return object
+    }
+    
+    public func rm(_ hash: Multihash) async throws -> [Multihash] {
+        try await self.rm(hash, recursive: true)
+    }
+    
+    public func rm(_ hash: Multihash, recursive: Bool) async throws -> [Multihash] {
+        
+        let result = try await parent!.fetchJson("pin/rm?stream-channels=true&r=\(recursive)&arg=\(b58String(hash))")
+            .eraseToAnyPublisher()
+            .async()
+        
+        
+        
+        guard let object = result.object?["Pins"]?.array else {
+            throw IpfsApiError.pinError("Pin.rm error: No Pinned objects in JSON data.")
+        }
+        
+        let multihashes = try object.map { try fromB58String($0.string!) }
+        
+        return multihashes
     }
     
 }

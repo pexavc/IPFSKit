@@ -69,12 +69,6 @@ public struct GraniteLogger {
         
         var disable: Bool {
             return true
-//            switch self {
-//            case .expedition:
-//                return false
-//            default:
-//                return true
-//            }
         }
     }
     

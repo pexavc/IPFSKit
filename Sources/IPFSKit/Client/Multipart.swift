@@ -8,6 +8,7 @@
 //  Licensed under MIT See LICENCE file in the root of this project for details. 
 
 import Foundation
+import Combine
 
 public enum MultipartError : Error {
     case failedURLCreation
@@ -35,7 +36,7 @@ public struct Multipart {
 
         guard let url = URL(string: targetUrl) else { throw MultipartError.failedURLCreation }
         request = NSMutableURLRequest(url: url)
-	request.addValue("Basic \(auth)", forHTTPHeaderField: "Authorization")
+        request.addValue("Basic \(auth)", forHTTPHeaderField: "Authorization")
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary="+boundary, forHTTPHeaderField: "content-type")
         request.setValue("Swift IPFS Client", forHTTPHeaderField: "user-agent")
@@ -143,7 +144,7 @@ extension Multipart {
         return oldMultipart
     }
     
-    public static func finishMultipart(_ multipart: Multipart, completionHandler: @escaping (Data) -> Void) {
+    public static func finishMultipart(_ multipart: Multipart) -> AnyPublisher<Data, URLError>  {
         
         let outString = "--" + multipart.boundary + "--" + lineFeed
         
@@ -152,22 +153,28 @@ extension Multipart {
         multipart.request.setValue(String(multipart.body.length), forHTTPHeaderField: "content-length")
         multipart.request.httpBody = multipart.body as Data
 
-        /// Send off the request
-        let task = URLSession.shared.dataTask(with: (multipart.request as URLRequest)) {
-            (data: Data?, response: URLResponse?, error: Error?) -> Void in
-            
-            // FIXME: use Swift 5 Result type rather than passing nil data.
-            if error != nil || data == nil {
-                GraniteLogger.info("Error in dataTaskWithRequest: \(String(describing: error))")
-                let emptyData = Data()
-                completionHandler(emptyData)
-                return
-            }
-
-            completionHandler(data!)
-            
-        }
+//        /// Send off the request
+//        let task = URLSession.shared.dataTask(with: (multipart.request as URLRequest)) {
+//            (data: Data?, response: URLResponse?, error: Error?) -> Void in
+//
+//            // FIXME: use Swift 5 Result type rather than passing nil data.
+//            if error != nil || data == nil {
+//                GraniteLogger.info("Error in dataTaskWithRequest: \(String(describing: error))")
+//                let emptyData = Data()
+//                completionHandler(emptyData)
+//                return
+//            }
+//
+//            completionHandler(data!)
+//
+//        }
+//
+//        task.resume()
         
-        task.resume()
+        
+        return URLSession.shared
+            .dataTaskPublisher(for: (multipart.request as URLRequest))
+            .map { $0.data }
+            .eraseToAnyPublisher()
     }
 }

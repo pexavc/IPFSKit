@@ -21,25 +21,24 @@ public class Bootstrap : ClientSubCommand {
     var parent: IPFSBase?
     
     
-    public func list(_ completionHandler: @escaping ([Multiaddr]) throws -> Void) throws {
-        
-        try fetchPeers("bootstrap/", completionHandler: completionHandler)
+    public func list() async throws -> [Multiaddr] {
+        try await fetchPeers("bootstrap/")
     }
     
-    public func add(_ addresses: [Multiaddr], completionHandler: @escaping ([Multiaddr]) throws -> Void) throws {
+    public func add(_ addresses: [Multiaddr]) async throws -> [Multiaddr] {
         
         let multiaddresses = try addresses.map { try $0.string() }
         let request = "bootstrap/add?" + buildArgString(multiaddresses)
         
-        try fetchPeers(request, completionHandler: completionHandler)
+        return try await fetchPeers(request)
     }
     
-    public func rm(_ addresses: [Multiaddr], completionHandler: @escaping ([Multiaddr]) throws -> Void) throws {
+    public func rm(_ addresses: [Multiaddr]) async throws -> [Multiaddr] {
         
-        try self.rm(addresses, all: false, completionHandler: completionHandler)
+        return try await self.rm(addresses, all: false)
     }
     
-    public func rm(_ addresses: [Multiaddr], all: Bool, completionHandler: @escaping ([Multiaddr]) throws -> Void) throws {
+    public func rm(_ addresses: [Multiaddr], all: Bool) async throws -> [Multiaddr] {
         
         let multiaddresses = try addresses.map { try $0.string() }
         var request = "bootstrap/rm?"
@@ -48,22 +47,21 @@ public class Bootstrap : ClientSubCommand {
         
         request += buildArgString(multiaddresses)
         
-        try fetchPeers(request, completionHandler: completionHandler)
+        return try await fetchPeers(request)
     }
     
-    private func fetchPeers(_ request: String, completionHandler: @escaping ([Multiaddr]) throws -> Void) throws {
+    private func fetchPeers(_ request: String) async throws -> [Multiaddr] {
                                                         
-        try parent!.fetchJson(request) {
-            result in
-            
-            var addresses: [Multiaddr] = []
-            if let peers = result.object?[IpfsCmdString.Peers.rawValue]?.array {
-                /// Make an array of Multiaddr from each peer
-                addresses = try peers.map { try newMultiaddr($0.string!) }
-            }
-                
-            /// convert the data into a Multiaddr array and pass it to the handler
-            try completionHandler(addresses)
+        let result = try await parent!.fetchJson(request)
+            .eraseToAnyPublisher()
+            .async()
+        var addresses: [Multiaddr] = []
+        if let peers = result.object?[IpfsCmdString.Peers.rawValue]?.array {
+            /// Make an array of Multiaddr from each peer
+            addresses = try peers.map { try newMultiaddr($0.string!) }
         }
+            
+        /// convert the data into a Multiaddr array and pass it to the handler
+        return addresses
     }
 }

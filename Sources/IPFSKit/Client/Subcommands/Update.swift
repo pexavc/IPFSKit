@@ -11,13 +11,17 @@ public class Update : ClientSubCommand {
     
     var parent: IPFSBase?
     
-    public func check(_ completionHandler: @escaping (JsonType) -> Void) throws {
+    public func check() async throws -> JsonType {
         
-        try parent!.fetchJson("update/check", completionHandler: completionHandler )
+        try await parent!.fetchJson("update/check")
+            .eraseToAnyPublisher()
+            .async()
     }
     
-    public func log(_ completionHandler: @escaping (JsonType) -> Void) throws {
+    public func log() async throws -> JsonType {
         
-        try parent!.fetchJson("update/log", completionHandler: completionHandler )
+        try await parent!.fetchJson("update/log")
+            .eraseToAnyPublisher()
+            .async()
     }
 }

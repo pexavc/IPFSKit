@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 
 /// This is to allow a Multihash to be used as a Dictionary key.
 extension Multihash : Hashable {
@@ -69,14 +70,13 @@ extension IPFSBase {
 //	stream.close()
 	
 	
-    func fetchJson(_ path: String, completionHandler: @escaping (JsonType) throws -> Void) throws {
-        try fetchData(path) {
+    func fetchJson(_ path: String) async throws -> Publishers.Map<AnyPublisher<Data, URLError>, JsonType> {
+        try await fetchData(path).map {
             (data: Data) in
 
             /// If there was no data fetched pass an empty dictionary and return.
             if data.count == 0 {
-                try completionHandler(JsonType.null)
-                return
+                return JsonType.null
             }
             
             GraniteLogger.info("The data: \(NSString(data: data, encoding: String.Encoding.utf8.rawValue) as String? ?? "failed to conv. str")")
@@ -87,25 +87,29 @@ extension IPFSBase {
 			do {
 				json = try JSONSerialization.jsonObject(with: data, options: JSONSerialization.ReadingOptions.allowFragments)
 			} catch {
-				/// So the serialization might have failed due to the json being concatenated.
-				/// Let's try fixing it
-				let fixedData: Data = fixStreamJson(data)
-				/// and try again
-				json = try JSONSerialization.jsonObject(with: fixedData, options: JSONSerialization.ReadingOptions.allowFragments)
+                do {
+                    /// So the serialization might have failed due to the json being concatenated.
+                    /// Let's try fixing it
+                    let fixedData: Data = fixStreamJson(data)
+                    /// and try again
+                    json = try JSONSerialization.jsonObject(with: fixedData, options: JSONSerialization.ReadingOptions.allowFragments)
+                } catch {
+                    return .null
+                }
 			}
             /// At this point we could check to see if the json contains a code/message for flagging errors.
             
-            try completionHandler(JsonType.parse(json as AnyObject))
+            return JsonType.parse(json as AnyObject)
         }
     }
     
-    func fetchData(_ path: String, completionHandler: @escaping (Data) throws -> Void) throws {
+    func fetchData(_ path: String) async throws -> AnyPublisher<Data, URLError> {
         
-        try net.receiveFrom(baseUrl + path, completionHandler: completionHandler)
+        try net.receiveFrom(baseUrl + path)
     }
     
-    func fetchBytes(_ path: String, completionHandler: @escaping ([UInt8]) throws -> Void) throws {
-        try fetchData(path) {
+    func fetchBytes(_ path: String) async throws -> [UInt8] {
+        try await fetchData(path).map {
             (data: Data) in
             
             /// Convert the data to a byte array
@@ -116,8 +120,10 @@ extension IPFSBase {
             // copy bytes into array
             (data as NSData).getBytes(&bytes, length:count * MemoryLayout<UInt8>.size)
             
-            try completionHandler(bytes)
+            return bytes
         }
+        .eraseToAnyPublisher()
+        .async()
     }
 }
 
@@ -194,7 +200,11 @@ public class IPFSClient: IPFSBase {
         if  protoComponents[0].hasPrefix("ip") == true &&
             protoComponents[2].hasPrefix("tcp") == true {
                 
-            try self.init(host: protoComponents[1],port: Int(protoComponents[3])!, id: "", secret: "")
+            //TODO: extract version and remove the default version param in primary init
+            try self.init(host: protoComponents[1],
+                          port: Int(protoComponents[3])!,
+                          id: "",
+                          secret: "")
         } else {
             throw IpfsApiError.initError
         }
@@ -204,13 +214,18 @@ public class IPFSClient: IPFSBase {
         try self.init(addr: newMultiaddr(addr))
     }
 
-    public init(host: String, port: Int, version: String = "/api/v0/", ssl: Bool = false, id: String, secret: String) throws {
+    public init(host: String,
+                port: Int,
+                version: String = "/api/v0/",
+                ssl: Bool = false,
+                id: String,
+                secret: String) throws {
         self.scheme = ssl ? "https://" : "http://"
         self.host = host
         self.port = port
         self.version = version
-	self.projectId = id
-	self.secret = secret
+        self.projectId = id
+        self.secret = secret
         
         /// No https yet as TLS1.2 in OS X 10.11 is not allowing comms with the node.
         baseUrl = "\(scheme)\(host):\(port)\(version)"
@@ -239,12 +254,21 @@ public class IPFSClient: IPFSBase {
 //        secondary.map { (var s: ClientSubCommand) in s.setParent(self) }
     }
     
+    public convenience init(_ gateway: IPFSGateway) throws {
+        try self.init(host: gateway.host.url,
+                      port: gateway.host.port,
+                      version: gateway.host.version,
+                      ssl: gateway.host.ssl,
+                      id: gateway.host.id ?? "",
+                      secret: gateway.host.secret ?? "")
+    }
+    
     
     /// base commands
     
-    public func add(_ filePath: String, completionHandler: @escaping ([MerkleNode]) -> Void) throws {
+    public func add(_ filePath: String) async throws -> [MerkleNode] {
         
-        try net.sendTo(baseUrl+"add?s", filePath: filePath) {
+        try await net.sendTo(baseUrl+"add?s", filePath: filePath).map {
             data in
             do {
                 /// If there was no data fetched pass an empty dictionary and return.
@@ -258,19 +282,21 @@ public class IPFSClient: IPFSBase {
                 /// Unwrap optionals
                 let result = res.compactMap{ $0 }
                 
-                completionHandler( result )
-                
+                return result
             } catch {
                 GraniteLogger.info("Error inside add completion handler: \(error)")
+                return .init()
             }
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
     // Store binary data
     
-    public func add(_ fileData: Data, completionHandler: @escaping ([MerkleNode]) -> Void) throws {
+    public func add(_ fileData: Data) async throws -> [MerkleNode] {
         
-        try net.sendTo(baseUrl+"add?stream-channels=true", content: fileData) {
+        try await net.sendTo(baseUrl+"add?stream-channels=true", content: fileData).map {
             data in
             do {
                 /// If there was no data fetched pass an empty dictionary and return.
@@ -285,74 +311,105 @@ public class IPFSClient: IPFSBase {
                 /// Unwrap optionals
                 let result = res.compactMap{ $0 }
                 
-                completionHandler( result )
+                return result
                 
             } catch {
                 GraniteLogger.info("Error inside add completion handler: \(error)")
+                return .init()
             }
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
-    public func ls(_ hash: Multihash, completionHandler: @escaping ([MerkleNode]) -> Void) throws {
+    public func ls(_ hash: Multihash) async throws -> [MerkleNode] {
         
-        try fetchJson("ls/\(b58String(hash))") {
+        try await fetchJson("ls/\(b58String(hash))").map {
             json in
             
             guard let objects = json.object?["Objects"]?.array else {
-                throw IpfsApiError.swarmError("ls error: No Objects in JSON data.")
+                //throw IpfsApiError.swarmError("ls error: No Objects in JSON data.")
+                GraniteLogger.info("ls error: no objects in JSON data")
+                return []
             }
             
-            let merkles = try objects.map { try merkleNodeFromJson2($0) }
-//            let tmp = try merkleNodesFromJson(json)
-            /// Unwrap optionals
-//            let merkles = tmp.flatMap{ $0 }
-
-            completionHandler(merkles)
+            do {
+                let merkles = try objects.map { try merkleNodeFromJson2($0) }
+                //            let tmp = try merkleNodesFromJson(json)
+                /// Unwrap optionals
+                //            let merkles = tmp.flatMap{ $0 }
+                return merkles
+            } catch let error {
+                GraniteLogger.info("ls error: \(error)")
+                return []
+            }
         }
+        .eraseToAnyPublisher()
+        .async()
     }
 
-    public func cat(_ hash: Multihash, completionHandler: @escaping ([UInt8]) -> Void) throws {
-        try fetchBytes("cat/\(b58String(hash))", completionHandler: completionHandler)
+    public func cat(_ hash: Multihash) async throws -> [UInt8] {
+        try await fetchBytes("cat/\(b58String(hash))")
     }
     
-    public func get(_ hash: Multihash, completionHandler: @escaping ([UInt8]) -> Void) throws {
-        try self.cat(hash, completionHandler: completionHandler)
+    public func get(_ hash: Multihash) async throws -> [UInt8] {
+        try await self.cat(hash)
     }
 
-
-    public func refs(_ hash: Multihash, recursive: Bool, completionHandler: @escaping ([Multihash]) -> Void) throws {
+    public func refs(_ hash: Multihash, recursive: Bool) async throws -> [Multihash] {
         
-        try fetchJson("refs?arg=" + b58String(hash) + "&r=\(recursive)") {
+        try await fetchJson("refs?arg=" + b58String(hash) + "&r=\(recursive)").map {
 			result in
-            guard let results = result.array else { throw IpfsApiError.unexpectedReturnType }
+            guard let results = result.array else { //throw IpfsApiError.unexpectedReturnType }
+                GraniteLogger.info("refs earlyExit: no data to process")
+                return []
+            }
             /// Extract the references and add them to an array.
             var refs: [Multihash] = []
 			
             for obj in results {
                 if let ref = obj.object?[IpfsCmdString.Ref.rawValue]?.string {
-                    let mh = try fromB58String(ref)
-                    refs.append(mh)
+                    do {
+                        let mh = try fromB58String(ref)
+                        refs.append(mh)
+                    } catch let error {
+                        GraniteLogger.info("refs error:\(error)")
+                    }
                 }
             }
             
-            completionHandler(refs)
+            return refs
         }
+        .eraseToAnyPublisher()
+        .async()
     }
 
-    public func resolve(_ scheme: String, hash: Multihash, recursive: Bool, completionHandler: @escaping (JsonType) -> Void) throws {
-        try fetchJson("resolve?arg=/\(scheme)/\(b58String(hash))&r=\(recursive)", completionHandler: completionHandler)
+    public func resolve(_ scheme: String,
+                        hash: Multihash,
+                        recursive: Bool) async throws -> JsonType {
+        try await fetchJson("resolve?arg=/\(scheme)/\(b58String(hash))&r=\(recursive)")
+            .eraseToAnyPublisher()
+            .async()
+        
     }
     
-    public func dns(_ domain: String, completionHandler: @escaping (String) -> Void) throws {
-        try fetchJson("dns?arg=" + domain) {
+    public func dns(_ domain: String) async throws -> String? {
+        try await fetchJson("dns?arg=" + domain).map {
             result in
             
-                guard let path = result.object?[IpfsCmdString.Path.rawValue]?.string else { throw IpfsApiError.resultMissingData("No Path found") }
-                completionHandler(path)
+            guard let path = result.object?[IpfsCmdString.Path.rawValue]?.string else {
+                
+                return nil
+            }
+                
+            return path
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
-    public func mount(_ ipfsRootPath: String = "/ipfs", ipnsRootPath: String = "/ipns", completionHandler: @escaping (JsonType) -> Void) throws {
+    public func mount(_ ipfsRootPath: String = "/ipfs",
+                      ipnsRootPath: String = "/ipns") async throws -> JsonType {
         
         let fileManager = FileManager.default
         
@@ -364,39 +421,49 @@ public class IPFSClient: IPFSBase {
             try fileManager.createDirectory(atPath: ipnsRootPath, withIntermediateDirectories: false, attributes: nil)
         }
         
-        try fetchJson("mount?arg=" + ipfsRootPath + "&arg=" + ipnsRootPath, completionHandler: completionHandler)
+        return try await fetchJson("mount?arg=" + ipfsRootPath + "&arg=" + ipnsRootPath)
+            .eraseToAnyPublisher()
+            .async()
     }
     
     /** ping is a tool to test sending data to other nodes. 
         It finds nodes via the routing system, send pings, wait for pongs, 
         and prints out round- trip latency information. */
-    public func ping(_ target: String, completionHandler: @escaping (JsonType) -> Void) throws {
-        try fetchJson("ping/" + target, completionHandler: completionHandler)
+    public func ping(_ target: String) async throws -> JsonType {
+        try await fetchJson("ping/" + target)
+            .eraseToAnyPublisher()
+            .async()
     }
     
     
-    public func id(_ target: String? = nil, completionHandler: @escaping (JsonType) -> Void) throws {
+    public func id(_ target: String? = nil) async throws -> JsonType {
         var request = "id"
         if target != nil { request += "/\(target!)" }
         
-        try fetchJson(request, completionHandler: completionHandler)
+        return try await fetchJson(request)
+            .eraseToAnyPublisher()
+            .async()
     }
     
-    public func version(_ completionHandler: @escaping (String) -> Void) throws {
-        try fetchJson("version") {
+    public func version() async throws -> String {
+        try await fetchJson("version").map {
             json in
             let version = json.object?[IpfsCmdString.Version.rawValue]?.string ?? ""
-            completionHandler(version)
+            return version
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
     /** List all available commands. */
-    public func commands(_ showOptions: Bool = false, completionHandler: @escaping (JsonType) -> Void) throws {
+    public func commands(_ showOptions: Bool = false) async throws -> JsonType {
         
         var request = "commands" //+ (showOptions ? "?flags=true&" : "")
         if showOptions { request += "?flags=true&" }
         
-        try fetchJson(request, completionHandler: completionHandler)
+        return try await fetchJson(request)
+            .eraseToAnyPublisher()
+            .async()
     }
     
     /** This method should take both a completion handler and an update handler.
@@ -436,8 +503,8 @@ public class IPFSClient: IPFSBase {
 /** Show or edit the list of bootstrap peers */
 extension IPFSBase {
     
-    public func bootstrap(_ completionHandler: @escaping ([Multiaddr]) -> Void) throws {
-        try bootstrap.list(completionHandler)
+    public func bootstrap() async throws -> [Multiaddr] {
+        try await bootstrap.list()
     }
 }
 

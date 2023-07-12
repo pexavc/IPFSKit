@@ -24,18 +24,20 @@ public class Name : ClientSubCommand {
         case key
     }
     
-    public func publish(_ hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
-        try self.publish(nil, hash: hash, completionHandler: completionHandler)
+    public func publish(_ hash: Multihash) async throws -> JsonType {
+        try  await self.publish(nil, hash: hash)
     }
     
-    public func publish(_ id: String? = nil, hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
+    public func publish(_ id: String? = nil, hash: Multihash) async throws -> JsonType {
         var request = "name/publish?arg="
         if id != nil { request += id! + "&arg=" }
 //        try parent!.fetchJson(request + "/ipfs/" + b58String(hash), completionHandler: completionHandler)
-        try parent!.fetchJson(request + b58String(hash), completionHandler: completionHandler)
+        return try await parent!.fetchJson(request + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
     }
     
-    public func publish(ipfsPath: String, args: [NamePublishArgType : Any]? = nil, completionHandler: @escaping (JsonType) -> Void) throws {
+    public func publish(ipfsPath: String, args: [NamePublishArgType : Any]? = nil) async throws -> JsonType {
         // strip the prefix
 //        let path = ipfsPath.replacingOccurrences(of: "/ipfs/", with: "")
         let path = ipfsPath.replacingOccurrences(of: "/", with: "%2F")
@@ -47,20 +49,20 @@ public class Name : ClientSubCommand {
         
         request += "&lifetime=\(lifetime)&resolve=\(resolve)"
         
-        try parent!.fetchJson(request, completionHandler: completionHandler)
+        return try await parent!.fetchJson(request)
+            .eraseToAnyPublisher()
+            .async()
     }
 
-    public func resolve(_ hash: Multihash? = nil, completionHandler: @escaping (String) -> Void) throws {
+    public func resolve(_ hash: Multihash? = nil) async throws -> String {
         
         var request = "name/resolve"
         if hash != nil { request += "?arg=" + b58String(hash!) }
         
-        try parent!.fetchJson(request) {
-            result in
-            
-            let resolvedName = result.object?[IpfsCmdString.Path.rawValue]?.string ?? ""
-            completionHandler(resolvedName)
-        }
+        let result = try await parent!.fetchJson(request).eraseToAnyPublisher()
+            .async()
+        
+        return result.object?[IpfsCmdString.Path.rawValue]?.string ?? ""
 //        try parent!.fetchData(request) {
 //            (rawJson: NSData) in
 //            GraniteLogger.info(rawJson)

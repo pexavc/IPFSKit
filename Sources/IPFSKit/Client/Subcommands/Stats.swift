@@ -15,8 +15,9 @@ public class Stats : ClientSubCommand {
     public func bw( _ peer: String? = nil,
         proto: String? = nil,
         poll: Bool = false,
-        interval: String? = nil,
-        completionHandler: @escaping (JsonType) -> Void) throws {
-            try parent!.fetchJson("stats/bw", completionHandler: completionHandler)
+        interval: String? = nil) async throws -> JsonType {
+            try await parent!.fetchJson("stats/bw")
+            .eraseToAnyPublisher()
+            .async()
     }
 }

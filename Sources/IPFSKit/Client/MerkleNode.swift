@@ -65,6 +65,15 @@ public class MerkleNode {
             throw error
         }
     }
+    
+    public init() {
+        self.name = "ERROR"
+        self.size = nil
+        self.type = nil
+        self.links = nil
+        self.data = nil
+        self.hash = nil
+    }
 }
 public func merkleNodesFromJson(_ rawJson: JsonType) throws -> [MerkleNode?] {
     var nodes = [MerkleNode?]()

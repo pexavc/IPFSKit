@@ -33,24 +33,24 @@ public class IpfsObject : ClientSubCommand {
      Available templates:
     	* unixfs-dir
      */
-    public func new(_ template: ObjectTemplates? = nil, completionHandler: @escaping (MerkleNode) throws -> Void) throws {
+    public func new(_ template: ObjectTemplates? = nil) async throws -> MerkleNode {
         var request = "object/new?stream-channels=true"
         if template != nil { request += "&arg=\(template!.rawValue)" }
-        try parent!.fetchJson(request) {
-            result in
-            try completionHandler( try merkleNodeFromJson2(result) )
-        }
+        let result = try await parent!.fetchJson(request)
+            .eraseToAnyPublisher()
+            .async()
+        return try merkleNodeFromJson2(result)
     }
     
     /** IpfsObject put is a plumbing command for storing DAG nodes.
      Its input is a byte array, and the output is a base58 encoded multihash.
      */
-    public func put(_ data: [UInt8], completionHandler: @escaping (MerkleNode) -> Void) throws {
+    public func put(_ data: [UInt8]) async throws -> MerkleNode {
         let bytes = data.withUnsafeBytes { $0.load(as: [UInt8].self) }
         
         let data2 = Data(bytes: bytes, count: data.count)
         
-        try parent!.net.sendTo(parent!.baseUrl+"object/put?stream-channels=true", content: data2) {
+        return try await parent!.net.sendTo(parent!.baseUrl+"object/put?stream-channels=true", content: data2).map {
             result in
             
             do {
@@ -59,43 +59,50 @@ public class IpfsObject : ClientSubCommand {
                     throw IpfsApiError.jsonSerializationFailed
                 }
                 
-                completionHandler(try merkleNodeFromJson(json as AnyObject))
+                return try merkleNodeFromJson(json as AnyObject)
             } catch {
                 GraniteLogger.info("IpfsObject Error:\(error)")
+                return .init()
             }
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
     /** IpfsObject get is a plumbing command for retreiving DAG nodes.
      Its input is a base58 encoded Multihash and it returns a MerkleNode.
      */
-    public func get(_ hash: Multihash, completionHandler: @escaping (MerkleNode) -> Void) throws {
+    public func get(_ hash: Multihash) async throws -> MerkleNode {
         
-        try parent!.fetchJson("object/get?stream-channels=true&arg=" + b58String(hash)){
-            result in
-            
-            guard var res = result.object else { throw IpfsApiError.resultMissingData("No object found!")}
-            res["Hash"] = .String(b58String(hash))
-            completionHandler(try merkleNodeFromJson2(.Object(res)))
-        }
+        let result = try await parent!.fetchJson("object/get?stream-channels=true&arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
+        
+        guard var res = result.object else { throw IpfsApiError.resultMissingData("No object found!")}
+        res["Hash"] = .String(b58String(hash))
+        
+        return try merkleNodeFromJson2(.Object(res))
     }
     
-    public func links(_ hash: Multihash, completionHandler: @escaping (MerkleNode) throws -> Void) throws {
+    public func links(_ hash: Multihash) async throws -> MerkleNode {
         
-        try parent!.fetchJson("object/links?stream-channels=true&arg=" + b58String(hash)){
-            result in
-            try completionHandler(try merkleNodeFromJson2(result))
-        }
+        let result = try await parent!.fetchJson("object/links?stream-channels=true&arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
+        
+        return try merkleNodeFromJson2(result)
     }
     
-    public func stat(_ hash: Multihash, completionHandler: @escaping (JsonType) -> Void) throws {
+    public func stat(_ hash: Multihash) async throws -> JsonType {
         
-        try parent!.fetchJson("object/stat?stream-channels=true&arg=" + b58String(hash), completionHandler: completionHandler)
+        try await parent!.fetchJson("object/stat?stream-channels=true&arg=" + b58String(hash))
+            .eraseToAnyPublisher()
+            .async()
     }
     
-    public func data(_ hash: Multihash, completionHandler: @escaping ([UInt8]) -> Void) throws {
+    public func data(_ hash: Multihash) async throws -> [UInt8] {
         
-        try parent!.fetchBytes("object/data?stream-channels=true&arg=" + b58String(hash), completionHandler: completionHandler)
+        try await parent!.fetchBytes("object/data?stream-channels=true&arg=" + b58String(hash))
     }
     
 //    public func patch(_ root: Multihash, cmd: ObjectPatchCommand, args: String..., completionHandler: @escaping (MerkleNode) throws -> Void) throws {
@@ -114,7 +121,7 @@ public class IpfsObject : ClientSubCommand {
 //        }
 //    }
     // change root to String ?
-    public func patch(_ root: Multihash, cmd: ObjectPatchCommand, args: String..., completionHandler: @escaping (MerkleNode) throws -> Void) throws {
+    public func patch(_ root: Multihash, cmd: ObjectPatchCommand, args: String...) async throws -> MerkleNode {
         
         var request: String = "object/patch"
         switch cmd {
@@ -139,9 +146,10 @@ public class IpfsObject : ClientSubCommand {
         
         request += buildArgString(args)
         
-        try parent!.fetchJson(request) {
-            result in
-            try completionHandler(try merkleNodeFromJson2(result))
-        }
+        let result = try await parent!.fetchJson(request)
+            .eraseToAnyPublisher()
+            .async()
+        
+        return try merkleNodeFromJson2(result)
     }
 }

@@ -14,18 +14,16 @@ public class Diag : ClientSubCommand {
     var parent: IPFSBase?
     
     /** Generates a network diagnostics report */
-    public func net(_ completionHandler: @escaping (String) -> Void) throws {
-        try parent!.fetchBytes("diag/net?stream-channels=true") {
-            bytes in
-            completionHandler(String(bytes: bytes, encoding: String.Encoding.utf8)!)
-        }
+    public func net() async throws -> String {
+        let bytes = try await parent!.fetchBytes("diag/net?stream-channels=true")
+        
+        return String(bytes: bytes, encoding: String.Encoding.utf8)!
     }
     
     /* Prints out system diagnostic information. */
-    public func sys(_ completionHandler: @escaping (String) -> Void) throws {
-        try parent!.fetchBytes("diag/sys?stream-channels=true") {
-            bytes in
-            completionHandler(String(bytes: bytes, encoding: String.Encoding.utf8)!)
-        }
+    public func sys() async throws -> String {
+        let bytes = try await parent!.fetchBytes("diag/sys?stream-channels=true")
+        
+        return String(bytes: bytes, encoding: String.Encoding.utf8)!
     }
 }

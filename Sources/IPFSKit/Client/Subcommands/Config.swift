@@ -10,35 +10,44 @@
 /** Config controls configuration variables. It works much like 'git config'.
  The configuration values are stored in a config file inside your IPFS repository.
  */
+import Foundation
+import Combine
+
 public class Config : ClientSubCommand {
     
     var parent: IPFSBase?
     
-    public func show(_ completionHandler: @escaping (JsonType) -> Void) throws {
+    public func show() async throws -> JsonType {
         
-        try parent!.fetchJson("config/show",completionHandler: completionHandler )
+        try await parent!.fetchJson("config/show")
+            .eraseToAnyPublisher()
+            .async()
     }
     
-    public func replace(_ filePath: String, completionHandler: (Bool) -> Void) throws {
-        try parent!.net.sendTo(parent!.baseUrl+"config/replace?stream-channels=true", filePath: filePath) {
-            _ in
-        }
-    }
-    
-    public func get(_ key: String, completionHandler: @escaping (JsonType) throws -> Void) throws {
-        try parent!.fetchJson("config?arg=" + key) {
+    public func replace(_ filePath: String) async throws -> Data {
+        try await parent!.net.sendTo(parent!.baseUrl+"config/replace?stream-channels=true", filePath: filePath).map {
             result in
-            guard let value = result.object?[IpfsCmdString.Value.rawValue] else {
-                throw IpfsApiError.swarmError("Config get error: \(String(describing: result.object?[IpfsCmdString.Message.rawValue]?.string))")
-            }
-            
-            try completionHandler(value)
-            
+            return result
         }
+        .eraseToAnyPublisher()
+        .async()
     }
     
-    public func set(_ key: String, value: String, completionHandler: @escaping (JsonType) throws -> Void) throws {
+    public func get(_ key: String) async throws -> JsonType {
+        let result = try await parent!.fetchJson("config?arg=" + key)
+            .eraseToAnyPublisher()
+            .async()
         
-        try parent!.fetchJson("config?arg=\(key)&arg=\(value)", completionHandler: completionHandler )
+        guard let value = result.object?[IpfsCmdString.Value.rawValue] else {
+            throw IpfsApiError.swarmError("Config get error: \(String(describing: result.object?[IpfsCmdString.Message.rawValue]?.string))")
+        }
+        
+        return value
+    }
+    
+    public func set(_ key: String, value: String) async throws -> JsonType {
+        try await parent!.fetchJson("config?arg=\(key)&arg=\(value)")
+            .eraseToAnyPublisher()
+            .async()
     }
 }
