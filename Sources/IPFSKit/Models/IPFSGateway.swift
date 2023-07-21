@@ -35,4 +35,10 @@ public extension IPFSGateway {
         
         return URL(string: urlString)
     }
+    func genericURL(for object: IPFSObject) -> URL? {
+        
+        let urlString = "https://gateway.ipfs.io/ipfs/" + (object.hashBase58String ?? "")
+        
+        return URL(string: urlString)
+    }
 }

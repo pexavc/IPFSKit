@@ -8,7 +8,9 @@
 import Foundation
 
 public class IPFS {
-    static var shared: IPFS? = nil
+    static var shared: IPFS? {
+        IPFSKit.current
+    }
     
     let client: IPFSClient?
     
@@ -51,6 +53,10 @@ public class IPFS {
         }
         
         return nil
+    }
+    
+    public static func ipns() {
+        guard let shared else { return }
     }
 }
 
