@@ -306,6 +306,7 @@ public class IPFSClient: IPFSBase {
                 GraniteLogger.info(json)
                 
                 let res = try merkleNodesFromJson(json)
+                
                 guard res.count > 0 else { throw IpfsApiError.jsonSerializationFailed }
                 
                 /// Unwrap optionals

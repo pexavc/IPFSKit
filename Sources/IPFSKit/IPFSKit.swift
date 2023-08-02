@@ -14,9 +14,10 @@ public class IPFSKit {
         }
         set {
             guard let newValue else { return }
-            IPFS.shared = .init(newValue)
+            current = .init(newValue)
             _gateway = newValue
         }
     }
     static var _gateway: IPFSGateway? = nil
+    public static var current: IPFS?
 }
