@@ -7,8 +7,8 @@
 
 import Foundation
 
-public protocol IPFSGateway  {
-    var host: IPFSHost { get }
+public protocol IPFSGateway: Equatable, Codable  {
+    var host: any IPFSHost { get }
     var gateway: String { get }
 }
 

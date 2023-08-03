@@ -10,7 +10,7 @@ import IPFSKit
 import CryptoKit
 
 struct InfuraGateway: IPFSGateway {
-    var host: IPFSHost {
+    var host: any IPFSHost {
         InfuraHost(id: "...",//On Infura, this is simply the API_KEY
                    secret: "...")//API_KEY_SECRET
     }

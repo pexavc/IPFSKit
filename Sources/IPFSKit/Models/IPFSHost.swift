@@ -7,7 +7,7 @@
 
 import Foundation
 
-public protocol IPFSHost {
+public protocol IPFSHost: Equatable, Codable {
     var url: String { get }
     var port: Int { get set }
     var ssl: Bool { get }

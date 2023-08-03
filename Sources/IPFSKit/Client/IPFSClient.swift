@@ -254,7 +254,7 @@ public class IPFSClient: IPFSBase {
 //        secondary.map { (var s: ClientSubCommand) in s.setParent(self) }
     }
     
-    public convenience init(_ gateway: IPFSGateway) throws {
+    public convenience init(_ gateway: any IPFSGateway) throws {
         try self.init(host: gateway.host.url,
                       port: gateway.host.port,
                       version: gateway.host.version,

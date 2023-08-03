@@ -8,7 +8,7 @@
 import Foundation
 
 public class IPFSKit {
-    public static var gateway: IPFSGateway? {
+    public static var gateway: (any IPFSGateway)? {
         get {
             return _gateway
         }
@@ -18,6 +18,6 @@ public class IPFSKit {
             _gateway = newValue
         }
     }
-    static var _gateway: IPFSGateway? = nil
+    static var _gateway: (any IPFSGateway)? = nil
     public static var current: IPFS?
 }

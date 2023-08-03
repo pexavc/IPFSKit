@@ -18,7 +18,7 @@ public class IPFS {
         client != nil
     }
     
-    init(_ gateway: IPFSGateway) {
+    init(_ gateway: any IPFSGateway) {
         client = try? .init(gateway)
     }
     
